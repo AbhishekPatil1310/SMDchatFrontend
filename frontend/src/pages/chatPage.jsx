@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { fetchMessages } from "../api/ChatApi";
 import { io } from "socket.io-client";
 import Sidebar from "../componete/sidebar";
+import { FaPaperclip } from "react-icons/fa";
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -10,6 +11,7 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState("");
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -55,17 +57,53 @@ export default function ChatPage() {
     };
   }, [id]);
 
-  // Handle sending a message
+  // Handle sending text message
   const handleSend = () => {
-    if (!newMessage) return;
+    if (!newMessage.trim()) return;
 
     socketRef.current.emit("private_message", { to: id, text: newMessage });
     setNewMessage("");
   };
 
+  // Handle Video Upload
+  const handleVideoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      const formData = new FormData();
+      formData.append("video", file);
+
+      const uploadUrl = `${import.meta.env.VITE_BACKEND_URL}/api/messages/upload-video/${id}`;
+
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      // Emit video message via WebSocket
+      socketRef.current.emit("private_message", {
+        to: id,
+        videoUrl: data.videoUrl,
+        _id: data._id,
+        from: data.from,
+      });
+
+      setMessages((prev) => [...prev, data]);
+    } catch (err) {
+      console.error("Video upload failed:", err);
+    }
+  };
+
   return (
     <div className="flex min-h-screen text-white font-sans relative">
-
       {/* Chat Area */}
       <div className="flex-1 flex flex-col relative z-10">
         {/* Background Video */}
@@ -76,9 +114,7 @@ export default function ChatPage() {
           playsInline
           className="fixed top-0 left-0 w-full h-full object-cover opacity-40 pointer-events-none z-0"
           src="/video.mp4"
-        >
-          Your browser does not support the video tag.
-        </video>
+        ></video>
 
         {/* Chat Header */}
         <div className="p-6 text-center z-10">
@@ -96,13 +132,22 @@ export default function ChatPage() {
                 className={`flex ${msg.from === id ? "justify-start" : "justify-end"}`}
               >
                 <div
-                  className={`px-4 py-2 rounded-lg max-w-xs sm:max-w-sm ${
-                    msg.from === id
+                  className={`px-4 py-2 rounded-lg max-w-xs sm:max-w-sm ${msg.from === id
                       ? "bg-gray-700 text-yellow-300 border border-yellow-500"
                       : "bg-yellow-500 text-black border border-yellow-300"
-                  }`}
+                    }`}
                 >
-                  {msg.text}
+                  {/* TEXT MESSAGE */}
+                  {msg.text && <p>{msg.text}</p>}
+
+                  {/* VIDEO MESSAGE */}
+                  {msg.videoUrl && (
+                    <video
+                      controls
+                      className="rounded-lg mt-2 max-w-full"
+                      src={msg.videoUrl}
+                    />
+                  )}
                 </div>
               </div>
             ))
@@ -114,6 +159,25 @@ export default function ChatPage() {
 
         {/* Sticky Input Section */}
         <div className="p-4 border-t border-yellow-500 bg-gray-800 flex gap-2 sticky bottom-0 z-10">
+
+          {/* Upload Icon */}
+          <button
+            className="bg-gray-700 p-2 rounded"
+            onClick={() => fileInputRef.current.click()}
+          >
+            <FaPaperclip size={20} className="text-yellow-400" />
+          </button>
+
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            accept="video/*"
+            ref={fileInputRef}
+            onChange={handleVideoUpload}
+            className="hidden"
+          />
+
+          {/* Text Input */}
           <input
             type="text"
             value={newMessage}
@@ -122,6 +186,8 @@ export default function ChatPage() {
             className="flex-1 bg-gray-700 text-white border border-yellow-400 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400"
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
           />
+
+          {/* Send Button */}
           <button
             onClick={handleSend}
             className="bg-yellow-500 text-black px-4 py-2 rounded font-bold hover:bg-yellow-400 transition"
