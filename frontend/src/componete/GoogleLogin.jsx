@@ -3,7 +3,7 @@ import React from "react";
 const GoogleSignInButton = ({ text = "Continue with Google" }) => {
   const handleGoogleSignIn = () => {
 
-    window.location.href = "https://sndchatbackend.onrender.com/api/auth/google/callback";
+window.location.href = "https://sndchatbackend.onrender.com/api/auth/google";
   };
 
   return (
@@ -36,4 +36,5 @@ const GoogleSignInButton = ({ text = "Continue with Google" }) => {
 };
 
 export default GoogleSignInButton;
+
 
